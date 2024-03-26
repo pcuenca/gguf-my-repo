@@ -46,7 +46,10 @@ def process_model(model_id, q_method, username, hf_token):
     shutil.rmtree(MODEL_NAME)
     print("Folder cleaned up successfully!")
 
-    return f"Processing complete: {repo_url}"
+    return (
+        f'Find your repo <a href=\'{repo_url}\' target="_blank" style="text-decoration:underline">here</a>',
+        "llama.png",
+    )    
 
 # Create Gradio interface
 iface = gr.Interface(
@@ -73,7 +76,14 @@ iface = gr.Interface(
             info="https://hf.co/settings/token"
         )
     ], 
-    outputs="text"
+    outputs=[
+        gr.Markdown(label="output"),
+        gr.Image(show_label=False),
+    ],
+    title="Create your own GGUF Quants!",
+    description="Create GGUF quants from any Hugging Face repository! You need to specify a write token obtained in https://hf.co/settings/tokens.",
+    article="<p>Find your write token at <a href='https://huggingface.co/settings/tokens' target='_blank'>token settings</a></p>",
+    
 )
 
 # Launch the interface
