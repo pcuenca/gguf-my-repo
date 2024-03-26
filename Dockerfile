@@ -37,7 +37,7 @@ RUN pyenv install ${PYTHON_VERSION} && \
     pyenv global ${PYTHON_VERSION} && \
     pyenv rehash && \
     pip install --no-cache-dir -U pip setuptools wheel && \
-    pip install "huggingface-hub" "hf-transfer"
+    pip install "huggingface-hub" "hf-transfer" "gradio"
 
 COPY --chown=1000 . ${HOME}/app
 RUN git clone https://github.com/ggerganov/llama.cpp && \
