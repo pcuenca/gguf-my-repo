@@ -1,5 +1,7 @@
-import gradio as gr
+import shutil
 import subprocess
+
+import gradio as gr
 
 from huggingface_hub import create_repo, HfApi
 from huggingface_hub import snapshot_download
@@ -24,7 +26,7 @@ def process_model(model_id, q_method, username, hf_token):
     print("Quantised successfully!")
 
     # Create empty repo
-    create_repo(
+    repo_url = create_repo(
         repo_id = f"{username}/{MODEL_NAME}-{q_method}-GGUF",
         repo_type="model",
         exist_ok=True,
@@ -36,21 +38,40 @@ def process_model(model_id, q_method, username, hf_token):
     api.upload_folder(
         folder_path=MODEL_NAME,
         repo_id=f"{username}/{MODEL_NAME}-{q_method}-GGUF",
-        allow_patterns=["*.gguf","$.md"],
+        allow_patterns=["*.gguf","*.md"],
         token=hf_token
     )
     print("Uploaded successfully!")
 
-    return "Processing complete."
+    shutil.rmtree(MODEL_NAME)
+    print("Folder cleaned up successfully!")
+
+    return f"Processing complete: {repo_url}"
 
 # Create Gradio interface
 iface = gr.Interface(
     fn=process_model, 
     inputs=[
-        gr.Textbox(lines=1, label="Model ID"),
-        gr.Textbox(lines=1, label="Quantization Methods"),
-        gr.Textbox(lines=1, label="Username"),
-        gr.Textbox(lines=1, label="Token")
+        gr.Textbox(
+            lines=1, 
+            label="Hub Model ID",
+            info="Model repo ID"
+        ),
+        gr.Dropdown(
+            ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"], 
+            label="Quantization Method", 
+            info="GGML quantisation type"
+        ),
+        gr.Textbox(
+            lines=1, 
+            label="Username",
+            info="Your Hugging Face username"
+        ),
+        gr.Textbox(
+            lines=1, 
+            label="HF Write Token",
+            info="https://hf.co/settings/token"
+        )
     ], 
     outputs="text"
 )
