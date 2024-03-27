@@ -72,11 +72,10 @@ def process_model(model_id, q_method, hf_token):
 
     api.upload_file(
         path_or_fileobj=f"{MODEL_NAME}/README-new.md",
-        path_in_repo=README.md,
+        path_in_repo="README.md",
         repo_id=repo_id,
         repo_type="model",
     )
-    
     print("Uploaded successfully!")
 
     shutil.rmtree(MODEL_NAME)
