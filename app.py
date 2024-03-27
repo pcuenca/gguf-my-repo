@@ -5,13 +5,16 @@ import gradio as gr
 
 from huggingface_hub import create_repo, HfApi
 from huggingface_hub import snapshot_download
+from huggingface_hub import whoami
 
 api = HfApi()
 
-def process_model(model_id, q_method, username, hf_token):
+def process_model(model_id, q_method, hf_token):
     
     MODEL_NAME = model_id.split('/')[-1]
     fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
+
+    username = whoami(hf_token)["name"]
     
     snapshot_download(repo_id=model_id, local_dir = f"{MODEL_NAME}", local_dir_use_symlinks=False)
     print("Model downloaded successully!")
@@ -35,11 +38,16 @@ def process_model(model_id, q_method, username, hf_token):
     print("Empty repo created successfully!")
 
     # Upload gguf files
-    api.upload_folder(
-        folder_path=MODEL_NAME,
+    # api.upload_folder(
+    #     folder_path=MODEL_NAME,
+    #     repo_id=f"{username}/{MODEL_NAME}-{q_method}-GGUF",
+    #     allow_patterns=["*.gguf"],
+    #     token=hf_token
+    # )
+    api.upload_file(
+        path_or_fileobj=qtype,
         repo_id=f"{username}/{MODEL_NAME}-{q_method}-GGUF",
-        allow_patterns=["*.gguf","*.md"],
-        token=hf_token
+        repo_type="model",
     )
     print("Uploaded successfully!")
 
@@ -64,11 +72,6 @@ iface = gr.Interface(
             ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"], 
             label="Quantization Method", 
             info="GGML quantisation type"
-        ),
-        gr.Textbox(
-            lines=1, 
-            label="Username",
-            info="Your Hugging Face username"
         ),
         gr.Textbox(
             lines=1, 
