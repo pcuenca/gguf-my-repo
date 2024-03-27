@@ -11,14 +11,9 @@ from huggingface_hub import ModelCard
 
 from textwrap import dedent
 
-api = HfApi()
-
-# for debugging
-default_token = os.environ.get("HF_TOKEN", "hf_xxxx")
-
 LLAMA_LIKE_ARCHS = ["MistralForCausalLM", "LlamaForCausalLM"]
 
-def script_to_use(model_id):
+def script_to_use(model_id, api):
     info = api.model_info(model_id)
     if info.config is None:
         return None
@@ -31,6 +26,8 @@ def script_to_use(model_id):
 def process_model(model_id, q_method, hf_token):
     MODEL_NAME = model_id.split('/')[-1]
     fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
+    
+    api = HfApi(token=hf_token)
 
     username = whoami(hf_token)["name"]
         
@@ -76,6 +73,10 @@ def process_model(model_id, q_method, hf_token):
 
         ```bash
         llama-cli --hf-repo {repo_id} --model {qtype.split("/")[-1]} -p "The meaning to life and the universe is "
+        ```
+
+        ```bash
+        llama-server --hf-repo {repo_id} --model {qtype.split("/")[-1]} -c 2048
         ```
         """
     )
@@ -126,7 +127,6 @@ iface = gr.Interface(
             label="HF Write Token",
             info="https://hf.co/settings/token",
             type="password",
-            value=default_token
         )
     ], 
     outputs=[
@@ -140,4 +140,4 @@ iface = gr.Interface(
 )
 
 # Launch the interface
-iface.launch(server_name="0.0.0.0", debug=True)
+iface.launch(debug=True)
