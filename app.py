@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 
@@ -6,6 +7,9 @@ import gradio as gr
 from huggingface_hub import create_repo, HfApi
 from huggingface_hub import snapshot_download
 from huggingface_hub import whoami
+from huggingface_hub import ModelCard
+
+from textwrap import dedent
 
 api = HfApi()
 
@@ -29,26 +33,50 @@ def process_model(model_id, q_method, hf_token):
     print("Quantised successfully!")
 
     # Create empty repo
+    repo_id = f"{username}/{MODEL_NAME}-{q_method}-GGUF"
     repo_url = create_repo(
-        repo_id = f"{username}/{MODEL_NAME}-{q_method}-GGUF",
+        repo_id = repo_id,
         repo_type="model",
         exist_ok=True,
         token=hf_token
     )
     print("Empty repo created successfully!")
 
-    # Upload gguf files
-    # api.upload_folder(
-    #     folder_path=MODEL_NAME,
-    #     repo_id=f"{username}/{MODEL_NAME}-{q_method}-GGUF",
-    #     allow_patterns=["*.gguf"],
-    #     token=hf_token
-    # )
+
+    card = ModelCard.load(model_id)
+    card.data.tags = ["llama-cpp"] if card.data.tags is None else card.data.tags + ["llama-cpp"]
+    card.text = dedent(
+        f"""
+        # {upload_repo}
+        This model was converted to GGUF format from [`{model_id}`](https://huggingface.co/{model_id}) using llama.cpp.
+        Refer to the [original model card](https://huggingface.co/{model_id}) for more details on the model.
+        ## Use with llama.cpp
+
+        ```bash
+        brew install ggerganov/ggerganov/llama.cpp
+        ```
+
+        ```bash
+        llama-cli --hf-repo {repo_id} --model {qtype.split("/")[-1]} -p "The meaning to life and the universe is "
+        ```
+        """
+    )
+    card.save(os.path.join(MODEL_NAME, "README-new.md"))
+    
     api.upload_file(
         path_or_fileobj=qtype,
-        repo_id=f"{username}/{MODEL_NAME}-{q_method}-GGUF",
+        path_in_repo=qtype.split("/")[-1],
+        repo_id=repo_id,
         repo_type="model",
     )
+
+    api.upload_file(
+        path_or_fileobj=f"{MODEL_NAME}/README-new.md",
+        path_in_repo=README.md,
+        repo_id=repo_id,
+        repo_type="model",
+    )
+    
     print("Uploaded successfully!")
 
     shutil.rmtree(MODEL_NAME)
