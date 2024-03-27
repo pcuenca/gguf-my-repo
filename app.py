@@ -125,6 +125,7 @@ iface = gr.Interface(
             lines=1, 
             label="HF Write Token",
             info="https://hf.co/settings/token",
+            type="password",
             value=default_token
         )
     ], 
