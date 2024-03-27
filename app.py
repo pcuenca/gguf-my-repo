@@ -47,7 +47,7 @@ def process_model(model_id, q_method, hf_token):
     card.data.tags = ["llama-cpp"] if card.data.tags is None else card.data.tags + ["llama-cpp"]
     card.text = dedent(
         f"""
-        # {upload_repo}
+        # {repo_id}
         This model was converted to GGUF format from [`{model_id}`](https://huggingface.co/{model_id}) using llama.cpp.
         Refer to the [original model card](https://huggingface.co/{model_id}) for more details on the model.
         ## Use with llama.cpp
