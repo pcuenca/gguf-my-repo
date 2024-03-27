@@ -24,10 +24,13 @@ def script_to_use(model_id, api):
     return "convert.py" if arch in LLAMA_LIKE_ARCHS else "convert-hf-to-gguf.py"
 
 def process_model(model_id, q_method, hf_token):
-    MODEL_NAME = model_id.split('/')[-1]
-    fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
-    
     try:
+        if not "/" in model_id:
+            raise Exception("Invalid model id, please use the format: `org/repo`. Example: `TinyLlama/TinyLlama-1.1B-Chat-v1.0`")
+
+        MODEL_NAME = f"models/{model_id.split('/')[-1]}"
+        fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
+
         api = HfApi(token=hf_token)
 
         username = whoami(hf_token)["name"]
@@ -105,7 +108,7 @@ def process_model(model_id, q_method, hf_token):
     except Exception as e:
         return (f"Error: {e}", "error.png")
     finally:
-        shutil.rmtree(MODEL_NAME, ignore_errors=True)
+        shutil.rmtree("models", ignore_errors=True)
         print("Folder cleaned up successfully!")
 
 
