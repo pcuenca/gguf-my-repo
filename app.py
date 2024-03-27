@@ -27,83 +27,87 @@ def process_model(model_id, q_method, hf_token):
     MODEL_NAME = model_id.split('/')[-1]
     fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
     
-    api = HfApi(token=hf_token)
+    try:
+        api = HfApi(token=hf_token)
 
-    username = whoami(hf_token)["name"]
+        username = whoami(hf_token)["name"]
+
+        snapshot_download(repo_id=model_id, local_dir = f"{MODEL_NAME}", local_dir_use_symlinks=False)
+        print("Model downloaded successully!")
         
-    snapshot_download(repo_id=model_id, local_dir = f"{MODEL_NAME}", local_dir_use_symlinks=False)
-    print("Model downloaded successully!")
-    
-    conversion_script = script_to_use(model_id)
-    fp16_conversion = f"python llama.cpp/{conversion_script} {MODEL_NAME} --outtype f16 --outfile {fp16}"
-    result = subprocess.run(fp16_conversion, shell=True, capture_output=True)
-    if result.returncode != 0:
-        return (f"Error converting to fp16: {result.stderr}", "error.png")
-    print("Model converted to fp16 successully!")
+        conversion_script = script_to_use(model_id, api)
+        fp16_conversion = f"python llama.cpp/{conversion_script} {MODEL_NAME} --outtype f16 --outfile {fp16}"
+        result = subprocess.run(fp16_conversion, shell=True, capture_output=True)
+        if result.returncode != 0:
+            raise Exception(f"Error converting to fp16: {result.stderr}")
+        print("Model converted to fp16 successully!")
 
-    qtype = f"{MODEL_NAME}/{MODEL_NAME.lower()}.{q_method.upper()}.gguf"
-    quantise_ggml = f"./llama.cpp/quantize {fp16} {qtype} {q_method}"
-    result = subprocess.run(quantise_ggml, shell=True, capture_output=True)
-    if result.returncode != 0:
-        return (f"Error quantizing: {result.stderr}", "error.png")
-    print("Quantised successfully!")
+        qtype = f"{MODEL_NAME}/{MODEL_NAME.lower()}.{q_method.upper()}.gguf"
+        quantise_ggml = f"./llama.cpp/quantize {fp16} {qtype} {q_method}"
+        result = subprocess.run(quantise_ggml, shell=True, capture_output=True)
+        if result.returncode != 0:
+            raise Exception(f"Error quantizing: {result.stderr}")
+        print("Quantised successfully!")
 
-    # Create empty repo
-    repo_id = f"{username}/{MODEL_NAME}-{q_method}-GGUF"
-    repo_url = create_repo(
-        repo_id = repo_id,
-        repo_type="model",
-        exist_ok=True,
-        token=hf_token
-    )
-    print("Repo created successfully!")
+        # Create empty repo
+        repo_id = f"{username}/{MODEL_NAME}-{q_method}-GGUF"
+        repo_url = create_repo(
+            repo_id = repo_id,
+            repo_type="model",
+            exist_ok=True,
+            token=hf_token
+        )
+        print("Repo created successfully!")
 
-    card = ModelCard.load(model_id)
-    card.data.tags = ["llama-cpp"] if card.data.tags is None else card.data.tags + ["llama-cpp"]
-    card.text = dedent(
-        f"""
-        # {repo_id}
-        This model was converted to GGUF format from [`{model_id}`](https://huggingface.co/{model_id}) using llama.cpp.
-        Refer to the [original model card](https://huggingface.co/{model_id}) for more details on the model.
-        ## Use with llama.cpp
+        card = ModelCard.load(model_id)
+        card.data.tags = ["llama-cpp"] if card.data.tags is None else card.data.tags + ["llama-cpp"]
+        card.text = dedent(
+            f"""
+            # {repo_id}
+            This model was converted to GGUF format from [`{model_id}`](https://huggingface.co/{model_id}) using llama.cpp.
+            Refer to the [original model card](https://huggingface.co/{model_id}) for more details on the model.
+            ## Use with llama.cpp
 
-        ```bash
-        brew install ggerganov/ggerganov/llama.cpp
-        ```
+            ```bash
+            brew install ggerganov/ggerganov/llama.cpp
+            ```
 
-        ```bash
-        llama-cli --hf-repo {repo_id} --model {qtype.split("/")[-1]} -p "The meaning to life and the universe is "
-        ```
+            ```bash
+            llama-cli --hf-repo {repo_id} --model {qtype.split("/")[-1]} -p "The meaning to life and the universe is "
+            ```
 
-        ```bash
-        llama-server --hf-repo {repo_id} --model {qtype.split("/")[-1]} -c 2048
-        ```
-        """
-    )
-    card.save(os.path.join(MODEL_NAME, "README-new.md"))
-    
-    api.upload_file(
-        path_or_fileobj=qtype,
-        path_in_repo=qtype.split("/")[-1],
-        repo_id=repo_id,
-        repo_type="model",
-    )
+            ```bash
+            llama-server --hf-repo {repo_id} --model {qtype.split("/")[-1]} -c 2048
+            ```
+            """
+        )
+        card.save(os.path.join(MODEL_NAME, "README-new.md"))
 
-    api.upload_file(
-        path_or_fileobj=f"{MODEL_NAME}/README-new.md",
-        path_in_repo="README.md",
-        repo_id=repo_id,
-        repo_type="model",
-    )
-    print("Uploaded successfully!")
+        api.upload_file(
+            path_or_fileobj=qtype,
+            path_in_repo=qtype.split("/")[-1],
+            repo_id=repo_id,
+            repo_type="model",
+        )
 
-    shutil.rmtree(MODEL_NAME)
-    print("Folder cleaned up successfully!")
+        api.upload_file(
+            path_or_fileobj=f"{MODEL_NAME}/README-new.md",
+            path_in_repo="README.md",
+            repo_id=repo_id,
+            repo_type="model",
+        )
+        print("Uploaded successfully!")
 
-    return (
-        f'Find your repo <a href=\'{repo_url}\' target="_blank" style="text-decoration:underline">here</a>',
-        "llama.png",
-    )    
+        return (
+            f'Find your repo <a href=\'{repo_url}\' target="_blank" style="text-decoration:underline">here</a>',
+            "llama.png",
+        )
+    except Exception as e:
+        return (f"Error: {e}", "error.png")
+    finally:
+        shutil.rmtree(MODEL_NAME, ignore_errors=True)
+        print("Folder cleaned up successfully!")
+
 
 # Create Gradio interface
 iface = gr.Interface(
