@@ -13,23 +13,42 @@ from textwrap import dedent
 
 api = HfApi()
 
+# for debugging
+default_token = os.environ.get("HF_TOKEN", "hf_xxxx")
+
+LLAMA_LIKE_ARCHS = ["MistralForCausalLM", "LlamaForCausalLM"]
+
+def script_to_use(model_id):
+    info = api.model_info(model_id)
+    if info.config is None:
+        return None
+    arch = info.config.get("architectures", None)
+    if arch is None:
+        return None
+    arch = arch[0]
+    return "convert.py" if arch in LLAMA_LIKE_ARCHS else "convert-hf-to-gguf.py"
+
 def process_model(model_id, q_method, hf_token):
-    
     MODEL_NAME = model_id.split('/')[-1]
     fp16 = f"{MODEL_NAME}/{MODEL_NAME.lower()}.fp16.bin"
 
     username = whoami(hf_token)["name"]
-    
+        
     snapshot_download(repo_id=model_id, local_dir = f"{MODEL_NAME}", local_dir_use_symlinks=False)
     print("Model downloaded successully!")
     
-    fp16_conversion = f"python llama.cpp/convert.py {MODEL_NAME} --outtype f16 --outfile {fp16}"
-    subprocess.run(fp16_conversion, shell=True)
+    conversion_script = script_to_use(model_id)
+    fp16_conversion = f"python llama.cpp/{conversion_script} {MODEL_NAME} --outtype f16 --outfile {fp16}"
+    result = subprocess.run(fp16_conversion, shell=True, capture_output=True)
+    if result.returncode != 0:
+        return (f"Error converting to fp16: {result.stderr}", "error.png")
     print("Model converted to fp16 successully!")
 
     qtype = f"{MODEL_NAME}/{MODEL_NAME.lower()}.{q_method.upper()}.gguf"
     quantise_ggml = f"./llama.cpp/quantize {fp16} {qtype} {q_method}"
-    subprocess.run(quantise_ggml, shell=True)
+    result = subprocess.run(quantise_ggml, shell=True, capture_output=True)
+    if result.returncode != 0:
+        return (f"Error quantizing: {result.stderr}", "error.png")
     print("Quantised successfully!")
 
     # Create empty repo
@@ -40,8 +59,7 @@ def process_model(model_id, q_method, hf_token):
         exist_ok=True,
         token=hf_token
     )
-    print("Empty repo created successfully!")
-
+    print("Repo created successfully!")
 
     card = ModelCard.load(model_id)
     card.data.tags = ["llama-cpp"] if card.data.tags is None else card.data.tags + ["llama-cpp"]
@@ -93,17 +111,21 @@ iface = gr.Interface(
         gr.Textbox(
             lines=1, 
             label="Hub Model ID",
-            info="Model repo ID"
+            info="Model repo ID",
+            placeholder="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+            value="TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         ),
         gr.Dropdown(
             ["Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L", "Q4_0", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_K_S", "Q5_K_M", "Q6_K", "Q8_0"], 
             label="Quantization Method", 
-            info="GGML quantisation type"
+            info="GGML quantisation type",
+            value="Q4_K_M",
         ),
         gr.Textbox(
             lines=1, 
             label="HF Write Token",
-            info="https://hf.co/settings/token"
+            info="https://hf.co/settings/token",
+            value=default_token
         )
     ], 
     outputs=[
@@ -117,4 +139,4 @@ iface = gr.Interface(
 )
 
 # Launch the interface
-iface.launch(debug=True)
+iface.launch(server_name="0.0.0.0", debug=True)
