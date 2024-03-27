@@ -1,6 +1,6 @@
 ---
-title: Gguf My Repo
-emoji: 🏢
+title: GGUF My Repo
+emoji: 🦙
 colorFrom: gray
 colorTo: pink
 sdk: docker
